@@ -27,18 +27,25 @@ class GroupSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
-class FollowingName(serializers.Field):
-    def to_representation(self, value):
-        return value.username
-
-    def to_internal_value(self, data):
-        return User.objects.get(username=data)
-
-
 class FollowSerializer(serializers.ModelSerializer):
     user = SlugRelatedField(read_only=True, slug_field='username')
-    following = FollowingName()
+    following = SlugRelatedField(
+        queryset=User.objects.all(),
+        slug_field='username'
+    )
 
     class Meta:
         model = Follow
         fields = ('user', 'following')
+
+    def validate_following(self, data):
+        user = self.context.get('request').user
+        if user == data:
+            raise serializers.ValidationError(
+                'You can not follow yourself'
+            )
+        if Follow.objects.filter(user=user, following=data).exists():
+            raise serializers.ValidationError(
+                'Such follow record already exists'
+            )
+        return data
